@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بحث المواد</title>
+    <style>
+        /* ... (ابقى على نفس التنسيقات السابقة) ... */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>بحث في المواد</h1>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="أدخل كود المادة...">
+            <button onclick="searchProduct()">بحث</button>
+            <button onclick="startBarcodeScanner()">📷 كاميرا</button>
+        </div>
+
+        <div id="cameraContainer"></div>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaxB_62OThGlIlE9xcU8cceMAH0bnZptw4_gRkwpM2jXVvj_nNxo4DsOCL_qkRm_QO/exec';
+        let stream = null;
+
+        async function fetchProductData(code) {
+            try {
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?code=${code}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error:', error);
+                return null;
+            }
+        }
+
+        async function searchProduct() {
+            const code = document.getElementById('searchInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!code) {
+                resultDiv.innerHTML = 'الرجاء إدخال كود المادة';
+                return;
+            }
+
+            const product = await fetchProductData(code);
+            
+            if (product && product.status === 'success') {
+                resultDiv.innerHTML = `
+                    <h3>${product.name}</h3>
+                    <p>سعر الجملة: ${product.wholesale}</p>
+                    <p>سعر المفرد: ${product.retail}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = 'لم يتم العثور على المادة';
+            }
+        }
+
+        async function startBarcodeScanner() {
+            const cameraContainer = document.getElementById('cameraContainer');
+            cameraContainer.innerHTML = '<video id="cameraPreview" autoplay playsinline></video>';
+            
+            const video = document.getElementById('cameraPreview');
+            
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                
+                const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'code_128', 'qr_code'] });
+                
+                const scanInterval = setInterval(async () => {
+                    try {
+                        const barcodes = await barcodeDetector.detect(video);
+                        if (barcodes.length > 0) {
+                            const barcode = barcodes[0].rawValue;
+                            document.getElementById('searchInput').value = barcode;
+                            stopCamera();
+                            clearInterval(scanInterval);
+                            searchProduct();
+                        }
+                    } catch (err) {
+                        console.log('Error scanning barcode:', err);
+                    }
+                }, 500); // فحص كل 500 مللي ثانية
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                cameraContainer.innerHTML = 'تعذر الوصول إلى الكاميرا';
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                document.getElementById('cameraContainer').innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>
