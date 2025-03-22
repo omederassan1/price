@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بحث المواد</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #cameraPreview {
+            width: 100%;
+            max-width: 300px;
+            margin-top: 20px;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>بحث في المواد</h1>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="أدخل كود المادة...">
+            <button onclick="searchProduct()">بحث</button>
+            <button onclick="startBarcodeScanner()">📷 كاميرا</button>
+        </div>
+
+        <div id="cameraContainer"></div>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        // استبدل هذا الرابط برابط الويب آب الخاص بجوجل سكريبت
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaxB_62OThGlIlE9xcU8cceMAH0bnZptw4_gRkwpM2jXVvj_nNxo4DsOCL_qkRm_QO/exec';
+
+        async function fetchProductData(code) {
+            try {
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?code=${code}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error:', error);
+                return null;
+            }
+        }
+
+        async function searchProduct() {
+            const code = document.getElementById('searchInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!code) {
+                resultDiv.innerHTML = 'الرجاء إدخال كود المادة';
+                return;
+            }
+
+            const product = await fetchProductData(code);
+            
+            if (product && product.status === 'success') {
+                resultDiv.innerHTML = `
+                    <h3>${product.name}</h3>
+                    <p>سعر الجملة: ${product.wholesale}</p>
+                    <p>سعر المفرد: ${product.retail}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = 'لم يتم العثور على المادة';
+            }
+        }
+
+        // دالة الباركود
+        async function startBarcodeScanner() {
+            const cameraContainer = document.getElementById('cameraContainer');
+            cameraContainer.innerHTML = '<video id="cameraPreview" autoplay playsinline></video>';
+            
+            const video = document.getElementById('cameraPreview');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                
+                const barcodeDetector = new BarcodeDetector();
+                
+                setInterval(async () => {
+                    try {
+                        const barcodes = await barcodeDetector.detect(video);
+                        if (barcodes.length > 0) {
+                            const barcode = barcodes[0].rawValue;
+                            document.getElementById('searchInput').value = barcode;
+                            searchProduct();
+                            stream.getTracks().forEach(track => track.stop());
+                            cameraContainer.innerHTML = '';
+                        }
+                    } catch (err) {
+                        console.log('Error scanning barcode:', err);
+                    }
+                }, 1000);
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+            }
+        }
+    </script>
+</body>
+</html>
