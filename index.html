@@ -107,7 +107,7 @@
   </div>
 
   <script>
-    const PRICE_API_URL = 'https://script.google.com/macros/s/AKfycbyFI5iWwWkxrJmL7zZRA0VYDm68dV8QkA4fqp4qQFZ28eWwLHBB_CWEpBAAPQLbVbHS/exec';
+    const PRICE_API_URL = 'https://script.google.com/macros/s/AKfycbyY0_u9CdEloibv2o02m_HQZAROXZGN9bWWuk47CUY6S166G5fsdfwq0TBmiej8OuBK/exec';
     const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbxOetGhckv30w3hfbPLLFUxBOT6bOSSPrDNgqdqaER2vqMXKYb7Bvz1eDsJY8AiiCuYKg/exec';
 
     let html5QrCode;
@@ -151,11 +151,12 @@
       let html = "";
 
       if (priceData && priceData.status === 'success') {
-        html += `<h3>${priceData.name}</h3>`;
-        html += `<p><strong>سعر الجملة:</strong> ${priceData.wholesale}</p>`;
-      } else {
-        html += "<p class='error'>⚠️ لم يتم العثور على الأسعار.</p>";
-      }
+  html += `<h3>${priceData.name}</h3>`;
+  html += `<p><strong>سعر الجملة:</strong> ${priceData.wholesale}</p>`;
+  html += `<p><strong>سعر المفرد:</strong> ${priceData.retail}</p>`;
+} else {
+  html += "<p class='error'>⚠️ لم يتم العثور على الأسعار.</p>";
+}
 
       if (stockData && stockData.length > 0) {
         let total = 0;
