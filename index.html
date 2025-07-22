@@ -117,6 +117,19 @@
       background-color: #6c757d;
       cursor: not-allowed;
     }
+
+    /* التوسيط للحقول على الهواتف */
+    @media (max-width: 600px) {
+      .order-section .form-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .order-section .form-group input {
+        width: 80%;
+        text-align: center;
+      }
+    }
   </style>
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
@@ -143,16 +156,30 @@
         <label for="itemCode">كود المادة:</label>
         <input type="text" id="itemCode" readonly>
       </div>
-      <!--
-      حقل اسم المادة تم إخفاؤه بناءً على طلبك للاحتفاظ فقط بالرمز، الكمية، السعر
-      -->
       <div class="form-group">
         <label for="quantity">الكمية:</label>
-        <input type="number" id="quantity" placeholder="أدخل الكمية (أرقام فقط)" min="1" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+        <input
+          type="number"
+          id="quantity"
+          placeholder="أدخل الكمية (أرقام فقط)"
+          min="1"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          value=""
+          oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+        >
       </div>
       <div class="form-group">
         <label for="price">السعر:</label>
-        <input type="text" id="price" placeholder="أدخل السعر" oninput="formatPrice(this)">
+        <input
+          type="text"
+          id="price"
+          placeholder="أدخل السعر"
+          inputmode="decimal"
+          pattern="[0-9.,]*"
+          value=""
+          oninput="formatPrice(this)"
+        >
       </div>
       <button id="submitOrder">إرسال الطلب</button>
     </div>
@@ -230,8 +257,8 @@
         };
 
         document.getElementById("itemCode").value = code;
-        // لا نعرض اسم المادة هنا بناءً على طلبك
-        document.getElementById("price").value = priceData.retail;
+        document.getElementById("price").value = ""; // اترك السعر فارغ
+        document.getElementById("quantity").value = ""; // اترك الكمية فارغة
         orderSection.style.display = 'block';
       } else {
         html += "<p class='error'>⚠️ لم يتم العثور على الأسعار.</p>";
