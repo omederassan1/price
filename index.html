@@ -234,14 +234,12 @@
         return;
       }
 
-      resultDiv.innerHTML = "<p class='loading'>⏳ جاري البحث...</p>";
+      resultDiv.innerHTML = "<p class='loading'>⏳ جاري البحث عن السعر...</p>";
       orderSection.style.display = 'none';
       currentItemData = null;
 
-      const [priceData, stockData] = await Promise.all([
-        fetchPrices(code),
-        fetchStock(code)
-      ]);
+      // جلب السعر أولاً
+      const priceData = await fetchPrices(code);
 
       let html = "";
 
@@ -265,21 +263,28 @@
         currentItemData = null;
       }
 
+      // عرض السعر أولاً
+      resultDiv.innerHTML = html;
+
+      // بعدها جلب المخزون وعرضه عند الاستلام
+      const stockData = await fetchStock(code);
+
       if (stockData && stockData.length > 0) {
         let total = 0;
-        html += `<h4>الرصيد في المستودعات:</h4>`;
-        html += `<table><tr><th>المستودع</th><th>الرصيد</th></tr>`;
+        let stockHtml = `<h4>الرصيد في المستودعات:</h4>`;
+        stockHtml += `<table><tr><th>المستودع</th><th>الرصيد</th></tr>`;
         stockData.forEach(item => {
-          html += `<tr><td>${item.warehouse}</td><td>${item.balance}</td></tr>`;
+          stockHtml += `<tr><td>${item.warehouse}</td><td>${item.balance}</td></tr>`;
           total += parseFloat(item.balance) || 0;
         });
-        html += `<tr><th>المجموع</th><th>${total}</th></tr>`;
-        html += `</table>`;
-      } else {
-        html += "<p class='error'>⚠️ لا يوجد رصيد في المستودعات.</p>";
-      }
+        stockHtml += `<tr><th>المجموع</th><th>${total}</th></tr>`;
+        stockHtml += `</table>`;
 
-      resultDiv.innerHTML = html;
+        // نضيف المخزون تحت السعر (نحتفظ بما عرضناه سابقاً)
+        resultDiv.innerHTML += stockHtml;
+      } else {
+        resultDiv.innerHTML += "<p class='error'>⚠️ لا يوجد رصيد في المستودعات.</p>";
+      }
     }
 
     function stopCamera() {
