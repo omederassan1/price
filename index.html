@@ -118,16 +118,15 @@ th { background: #f0f0f0; }
 </div>
 
 <script>
-/* روابط API */
+/* ===================== API ===================== */
 const PRICE_API_URL = 'https://script.google.com/macros/s/AKfycbyY0_u9CdEloibv2o02m_HQZAROXZGN9bWWuk47CUY6S166G5fsdfwq0TBmiej8OuBK/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbxOetGhckv30w3hfbPLLFUxBOT6bOSSPrDNgqdqaER2vqMXKYb7Bvz1eDsJY8AiiCuYKg/exec';
 
-/* مفاتيح التخزين اليومي */
+/* ===================== الكاش اليومي ===================== */
 const DAILY_PRICE_KEY = "daily_prices_v1";
 const DAILY_PRICE_DATE_KEY = "daily_prices_date_v1";
 let dailyPriceCache = {};
 
-/* تحميل الأسعار مرة واحدة يوميًا */
 async function loadDailyPrices() {
   const today = new Date().toISOString().slice(0,10);
   const savedDate = localStorage.getItem(DAILY_PRICE_DATE_KEY);
@@ -136,49 +135,40 @@ async function loadDailyPrices() {
     const cached = localStorage.getItem(DAILY_PRICE_KEY);
     if (cached) {
       dailyPriceCache = JSON.parse(cached);
-      console.log("⚡ أسعار اليوم من الهاتف");
       return;
     }
   }
 
-  console.log("⬇️ تحميل أسعار اليوم...");
   const res = await fetch(`${PRICE_API_URL}?all=true&sheet=Sheet2`);
   const data = await res.json();
 
   dailyPriceCache = {};
-  data.forEach(item => {
-    dailyPriceCache[item.code] = item;
-  });
+  data.forEach(item => dailyPriceCache[item.code] = item);
 
   localStorage.setItem(DAILY_PRICE_KEY, JSON.stringify(dailyPriceCache));
   localStorage.setItem(DAILY_PRICE_DATE_KEY, today);
-  console.log("✅ تم تحميل الأسعار اليومية");
 }
 
 window.addEventListener("load", loadDailyPrices);
 
-/* جلب السعر من الكاش */
+/* ===================== الأسعار ===================== */
 async function fetchPrices(code) {
-  if (dailyPriceCache[code]) {
-    return dailyPriceCache[code];
-  }
+  if (dailyPriceCache[code]) return dailyPriceCache[code];
   const res = await fetch(`${PRICE_API_URL}?code=${code}&sheet=Sheet2`);
   return await res.json();
 }
 
-/* جلب المخزون */
 async function fetchStock(code) {
   const res = await fetch(`${STOCK_API_URL}?code=${code}`);
   return await res.json();
 }
 
-/* تنسيق السعر */
 function formatPrice(input) {
   let v = input.value.replace(/[^\d]/g,'');
   input.value = v ? Number(v).toLocaleString('en-US') : '';
 }
 
-/* البحث */
+/* ===================== البحث ===================== */
 async function searchAll() {
   const code = searchInput.value.trim();
   if (!code) return;
@@ -187,30 +177,26 @@ async function searchAll() {
   orderSection.style.display = "none";
 
   const priceData = await fetchPrices(code);
-  let html = "";
 
-  if (priceData) {
-    html += `<h3>${priceData.name}</h3>
-      <p>سعر الجملة:
-        <span class="price-box wholesale">
-          ${Number(priceData.wholesale).toLocaleString('en-US')}
-        </span>
-      </p>
-      <p>سعر المفرد:
-        <span class="price-box retail">
-          ${Number(priceData.retail).toLocaleString('en-US')}
-        </span>
-      </p>`;
-
-    itemCode.value = code;
-    quantity.value = "";
-    price.value = "";
-    orderSection.style.display = "block";
-  } else {
-    html = "<p class='error'>لا توجد أسعار</p>";
+  if (!priceData) {
+    result.innerHTML = "<p class='error'>لا توجد أسعار</p>";
+    return;
   }
 
-  result.innerHTML = html;
+  result.innerHTML = `
+    <h3>${priceData.name}</h3>
+    <p>سعر الجملة:
+      <span class="price-box wholesale">${Number(priceData.wholesale).toLocaleString('en-US')}</span>
+    </p>
+    <p>سعر المفرد:
+      <span class="price-box retail">${Number(priceData.retail).toLocaleString('en-US')}</span>
+    </p>
+  `;
+
+  itemCode.value = code;
+  quantity.value = "";
+  price.value = "";
+  orderSection.style.display = "block";
 
   const stock = await fetchStock(code);
   const baghdad = stock?.find(s => s.warehouse.includes("بغداد"));
@@ -220,17 +206,51 @@ async function searchAll() {
       <h4>مخزون مستودع بغداد</h4>
       <table>
         <tr><th>المستودع</th><th>الرصيد</th></tr>
-        <tr>
-          <td>بغداد</td>
-          <td>${Number(baghdad.balance).toLocaleString('en-US')}</td>
-        </tr>
-      </table>`;
+        <tr><td>بغداد</td><td>${Number(baghdad.balance).toLocaleString('en-US')}</td></tr>
+      </table>
+    `;
   } else {
     result.innerHTML += "<p class='error'>لا يوجد رصيد في بغداد</p>";
   }
 }
 
+/* ===================== الكاميرا (كما كانت) ===================== */
+let html5QrCode;
+
+function stopCamera() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      cameraContainer.innerHTML = "";
+    });
+  }
+}
+
+async function startBarcodeScanner() {
+  cameraContainer.innerHTML = "";
+  html5QrCode = new Html5Qrcode("cameraContainer");
+
+  const devices = await Html5Qrcode.getCameras();
+  if (!devices.length) {
+    cameraContainer.innerHTML = "<p class='error'>لا توجد كاميرا</p>";
+    return;
+  }
+
+  const camera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
+
+  html5QrCode.start(
+    camera.id,
+    { fps: 10, qrbox: 250 },
+    decodedText => {
+      searchInput.value = decodedText;
+      stopCamera();
+      searchAll();
+    }
+  );
+}
+
+/* ===================== أحداث ===================== */
 searchButton.onclick = searchAll;
+scanButton.onclick = startBarcodeScanner;
 </script>
 </body>
 </html>
