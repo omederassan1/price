@@ -64,6 +64,11 @@ button {
   color: #28a745;
   background: #f4fff7;
 }
+.plumber {
+  border: 2px solid #ffc107;
+  color: #856404;
+  background: #fff8e1;
+}
 
 table {
   width: 100%;
@@ -118,42 +123,10 @@ th { background: #f0f0f0; }
 </div>
 
 <script>
-/* ===================== API ===================== */
-const PRICE_API_URL = 'https://script.google.com/macros/s/AKfycbyY0_u9CdEloibv2o02m_HQZAROXZGN9bWWuk47CUY6S166G5fsdfwq0TBmiej8OuBK/exec';
+const PRICE_API_URL = 'https://script.google.com/macros/s/AKfycbwlxKnBrvLBFlZEiP6auRQdI0laM1TuGeNWEGh0th3PvjJv5VYFzW1bTD_qxGvypb9F/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbxOetGhckv30w3hfbPLLFUxBOT6bOSSPrDNgqdqaER2vqMXKYb7Bvz1eDsJY8AiiCuYKg/exec';
 
-/* ===================== الكاش اليومي ===================== */
-const DAILY_PRICE_KEY = "daily_prices_v1";
-const DAILY_PRICE_DATE_KEY = "daily_prices_date_v1";
-let dailyPriceCache = {};
-
-async function loadDailyPrices() {
-  const today = new Date().toISOString().slice(0,10);
-  const savedDate = localStorage.getItem(DAILY_PRICE_DATE_KEY);
-
-  if (savedDate === today) {
-    const cached = localStorage.getItem(DAILY_PRICE_KEY);
-    if (cached) {
-      dailyPriceCache = JSON.parse(cached);
-      return;
-    }
-  }
-
-  const res = await fetch(`${PRICE_API_URL}?all=true&sheet=Sheet2`);
-  const data = await res.json();
-
-  dailyPriceCache = {};
-  data.forEach(item => dailyPriceCache[item.code] = item);
-
-  localStorage.setItem(DAILY_PRICE_KEY, JSON.stringify(dailyPriceCache));
-  localStorage.setItem(DAILY_PRICE_DATE_KEY, today);
-}
-
-window.addEventListener("load", loadDailyPrices);
-
-/* ===================== الأسعار ===================== */
 async function fetchPrices(code) {
-  if (dailyPriceCache[code]) return dailyPriceCache[code];
   const res = await fetch(`${PRICE_API_URL}?code=${code}&sheet=Sheet2`);
   return await res.json();
 }
@@ -168,7 +141,6 @@ function formatPrice(input) {
   input.value = v ? Number(v).toLocaleString('en-US') : '';
 }
 
-/* ===================== البحث ===================== */
 async function searchAll() {
   const code = searchInput.value.trim();
   if (!code) return;
@@ -178,18 +150,24 @@ async function searchAll() {
 
   const priceData = await fetchPrices(code);
 
-  if (!priceData) {
+  if (!priceData || priceData.status !== 'success') {
     result.innerHTML = "<p class='error'>لا توجد أسعار</p>";
     return;
   }
 
   result.innerHTML = `
     <h3>${priceData.name}</h3>
-    <p>سعر الجملة:
+
+    <p>جملة بغداد:
       <span class="price-box wholesale">${Number(priceData.wholesale).toLocaleString('en-US')}</span>
     </p>
-    <p>سعر المفرد:
+
+    <p>جملة معرض:
       <span class="price-box retail">${Number(priceData.retail).toLocaleString('en-US')}</span>
+    </p>
+
+    <p>جملة سباك:
+      <span class="price-box plumber">${Number(priceData.plumber).toLocaleString('en-US')}</span>
     </p>
   `;
 
@@ -214,43 +192,7 @@ async function searchAll() {
   }
 }
 
-/* ===================== الكاميرا (كما كانت) ===================== */
-let html5QrCode;
-
-function stopCamera() {
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      cameraContainer.innerHTML = "";
-    });
-  }
-}
-
-async function startBarcodeScanner() {
-  cameraContainer.innerHTML = "";
-  html5QrCode = new Html5Qrcode("cameraContainer");
-
-  const devices = await Html5Qrcode.getCameras();
-  if (!devices.length) {
-    cameraContainer.innerHTML = "<p class='error'>لا توجد كاميرا</p>";
-    return;
-  }
-
-  const camera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
-
-  html5QrCode.start(
-    camera.id,
-    { fps: 10, qrbox: 250 },
-    decodedText => {
-      searchInput.value = decodedText;
-      stopCamera();
-      searchAll();
-    }
-  );
-}
-
-/* ===================== أحداث ===================== */
 searchButton.onclick = searchAll;
-scanButton.onclick = startBarcodeScanner;
 </script>
 </body>
 </html>
