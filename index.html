@@ -24,6 +24,7 @@ th { background:#f0f0f0; }
 .error { color:red; font-weight:bold; }
 .order-section { margin-top:25px; padding:20px; border:1px solid #ddd; border-radius:10px; background:#f8f9fa; display:none; flex-direction:column; align-items:center; gap:15px; }
 .order-section input { width:80%; text-align:center; font-size:18px; padding:10px; border-radius:8px; border:1px solid #ccc; }
+.stock-section { margin-top:15px; width:100%; }
 </style>
 <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
@@ -48,6 +49,7 @@ th { background:#f0f0f0; }
   <input type="number" id="quantity" placeholder="الكمية" inputmode="numeric">
   <input type="text" id="price" placeholder="السعر" inputmode="decimal">
   <button id="submitOrder">إرسال الطلب</button>
+  <div class="stock-section" id="stockSection"></div>
 </div>
 </div>
 
@@ -61,25 +63,20 @@ function formatPrice(input){
   input.value = val ? Number(val).toLocaleString('en-US') : '';
 }
 
-async function fetchPrices(code){
-  const res = await fetch(`${PRICE_API_URL}?code=${code}`);
-  return await res.json();
-}
-
-async function fetchStock(code){
-  const res = await fetch(`${STOCK_API_URL}?code=${code}`);
-  return await res.json();
-}
+async function fetchPrices(code){ return await (await fetch(`${PRICE_API_URL}?code=${code}`)).json(); }
+async function fetchStock(code){ return await (await fetch(`${STOCK_API_URL}?code=${code}`)).json(); }
 
 async function searchAll(){
   const code = searchInput.value.trim();
   if(!code) return;
   result.innerHTML = "<p class='loading'>⏳ جاري البحث...</p>";
   orderSection.style.display = "none";
+  stockSection.innerHTML = "";
 
   const priceData = await fetchPrices(code);
   if(!priceData || priceData.status!=='success'){ result.innerHTML="<p class='error'>لا توجد أسعار</p>"; return; }
 
+  // عرض الأسعار
   result.innerHTML = `
     <h3>${priceData.name}</h3>
     <p>جملة بغداد: <span class="price-box wholesale">${(priceData.wholesale||0).toLocaleString('en-US')}</span></p>
@@ -87,18 +84,22 @@ async function searchAll(){
     <p>جملة سباك: <span class="price-box plumber">${(priceData.plumber||0).toLocaleString('en-US')}</span></p>
   `;
 
+  // إعداد الطلبية
   itemCode.value = code;
   quantity.value = "";
   price.value = "";
   orderSection.style.display = "flex";
 
+  // عرض المخزون بعد الطلبية في stockSection
   const stock = await fetchStock(code);
   const baghdad = stock?.find(s => s.warehouse.includes("بغداد"));
   if(baghdad){
-    result.innerHTML += `<h4>مخزون مستودع بغداد</h4>
+    stockSection.innerHTML = `<h4>مخزون مستودع بغداد</h4>
       <table><tr><th>المستودع</th><th>الرصيد</th></tr>
       <tr><td>بغداد</td><td>${Number(baghdad.balance).toLocaleString('en-US')}</td></tr></table>`;
-  } else { result.innerHTML += "<p class='error'>لا يوجد رصيد في بغداد</p>"; }
+  } else {
+    stockSection.innerHTML = "<p class='error'>لا يوجد رصيد في بغداد</p>";
+  }
 }
 
 /* كاميرا */
@@ -124,7 +125,7 @@ submitOrder.onclick = async function(){
 
   try{
     const formData = new FormData();
-    formData.append("code", "'" + itemCode.value); // ' للحفاظ على الصفر
+    formData.append("code", "'" + itemCode.value); // للحفاظ على الصفر
     formData.append("quantity", quantity.value);
     formData.append("price", price.value.replace(/,/g,''));
     formData.append("date", new Date().toISOString());
@@ -136,7 +137,7 @@ submitOrder.onclick = async function(){
 
     setTimeout(()=>{
       searchInput.value=""; itemCode.value=""; quantity.value=""; price.value="";
-      orderSection.style.display="none"; result.innerHTML="";
+      orderSection.style.display="none"; result.innerHTML=""; stockSection.innerHTML="";
       this.disabled=false; this.innerText="إرسال الطلب"; this.style.background="#ff0000";
     },2000);
 
