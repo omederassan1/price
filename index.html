@@ -25,12 +25,13 @@ th { background:#f0f0f0; }
 .order-section { margin-top:25px; padding:20px; border:1px solid #ddd; border-radius:10px; background:#f8f9fa; display:none; flex-direction:column; align-items:center; gap:15px; }
 .order-section input { width:80%; text-align:center; font-size:18px; padding:10px; border-radius:8px; border:1px solid #ccc; }
 .stock-section { margin-top:15px; width:100%; }
+#cameraContainer { width:100%; max-width:400px; margin:10px auto; }
 </style>
 <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
 <div class="container">
-<h1>شركة أومیدی راسان-بغداد</h1>
+<h1>شركة أومیدي راسان-بغداد</h1>
 
 <div class="search-box">
   <input type="text" id="searchInput" placeholder="أدخل كود المادة أو الباركود">
@@ -41,6 +42,9 @@ th { background:#f0f0f0; }
 </div>
 
 <div id="cameraContainer"></div>
+<div class="buttons" id="switchCameraWrap" style="display:none; margin-top:10px;">
+  <button id="switchCameraButton" type="button">🔄 تبديل الكاميرا</button>
+</div>
 <div id="result"></div>
 
 <div class="order-section" id="orderSection">
@@ -104,15 +108,85 @@ async function searchAll(){
 
 /* كاميرا */
 let html5QrCode;
-function stopCamera(){ if(html5QrCode) html5QrCode.stop().then(()=>{cameraContainer.innerHTML="";}).catch(()=>{}); }
-async function startBarcodeScanner(){
+let currentFacingMode = "environment"; // الخلفية افتراضياً
+let availableCameras = [];
+let currentCameraIndex = 0;
+
+function stopCamera(){
+  if(html5QrCode && html5QrCode.isScanning){
+    return html5QrCode.stop().then(()=>{
+      cameraContainer.innerHTML="";
+      switchCameraWrap.style.display="none";
+    }).catch(()=>{});
+  }
   cameraContainer.innerHTML="";
-  html5QrCode=new Html5Qrcode("cameraContainer");
-  const devices = await Html5Qrcode.getCameras();
-  if(!devices.length){ cameraContainer.innerHTML="<p class='error'>لا توجد كاميرا</p>"; return; }
-  const camera = devices.find(d=>d.label.toLowerCase().includes("back"))||devices[0];
-  html5QrCode.start(camera.id,{fps:10,qrbox:250},decodedText=>{ searchInput.value=decodedText; stopCamera(); searchAll(); });
+  switchCameraWrap.style.display="none";
+  return Promise.resolve();
 }
+
+function onScanSuccess(decodedText){
+  searchInput.value = decodedText;
+  stopCamera();
+  searchAll();
+}
+
+async function startWithFacingMode(){
+  cameraContainer.innerHTML="";
+  html5QrCode = new Html5Qrcode("cameraContainer");
+  try{
+    await html5QrCode.start(
+      { facingMode: currentFacingMode },
+      { fps:10, qrbox:250 },
+      onScanSuccess
+    );
+    switchCameraWrap.style.display = "flex";
+  }catch(err){
+    // إذا فشل facingMode (نادر)، جرّب عرض قائمة الكاميرات كخيار احتياطي
+    await startWithDeviceList();
+  }
+}
+
+async function startWithDeviceList(){
+  cameraContainer.innerHTML="";
+  html5QrCode = new Html5Qrcode("cameraContainer");
+  availableCameras = await Html5Qrcode.getCameras();
+  if(!availableCameras.length){ cameraContainer.innerHTML="<p class='error'>لا توجد كاميرا</p>"; return; }
+
+  // حاول العثور على الكاميرا الخلفية بالاسم كخيار احتياطي أخير
+  let idx = availableCameras.findIndex(d => /back|rear|environment/i.test(d.label));
+  currentCameraIndex = idx !== -1 ? idx : 0;
+
+  await html5QrCode.start(
+    availableCameras[currentCameraIndex].id,
+    { fps:10, qrbox:250 },
+    onScanSuccess
+  );
+  if(availableCameras.length > 1){ switchCameraWrap.style.display = "flex"; }
+}
+
+async function startBarcodeScanner(){
+  currentFacingMode = "environment";
+  await startWithFacingMode();
+}
+
+switchCameraButton.onclick = async function(){
+  await stopCamera();
+  if(availableCameras.length){
+    // نتنقل بين قائمة الكاميرات المتاحة
+    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+    html5QrCode = new Html5Qrcode("cameraContainer");
+    await html5QrCode.start(
+      availableCameras[currentCameraIndex].id,
+      { fps:10, qrbox:250 },
+      onScanSuccess
+    );
+    switchCameraWrap.style.display = "flex";
+  } else {
+    // نبدّل بين الأمامية والخلفية عبر facingMode
+    currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+    await startWithFacingMode();
+  }
+};
 
 /* إرسال الطلب */
 submitOrder.onclick = async function(){
